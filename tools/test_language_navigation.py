@@ -73,6 +73,22 @@ def check_local():
             raise AssertionError(f"{language}: html lang is {actual}, expected {expected}")
     print("PASS: all localized pages declare their own language")
 
+    retention_markers = {
+        "de": "Bereinigungsjob ungefähr alle sechs Stunden",
+        "en": "scheduled cleanup job checks approximately every six hours",
+        "es": "un proceso de limpieza programado comprueba aproximadamente cada seis horas",
+        "fr": "une tâche de nettoyage planifiée vérifie environ toutes les six heures",
+        "pt-br": "uma tarefa de limpeza programada verifica aproximadamente a cada seis horas",
+    }
+    stale_markers = ("manually removed", "manuelle Löschung", "borrado manualmente", "suppression manuelle", "removido manualmente")
+    for language, marker in retention_markers.items():
+        content = pages[f"{language}/index.html"]
+        if marker not in content:
+            raise AssertionError(f"{language}: missing accurate scheduled room cleanup disclosure")
+        if any(stale in content for stale in stale_markers):
+            raise AssertionError(f"{language}: stale manual-only room cleanup claim remains")
+    print("PASS: all five privacy translations describe scheduled room cleanup and no longer claim manual-only deletion")
+
 
 def check_live():
     expected_urls = {language: urljoin(BASE_URL, f"{language}/") for language in LANGUAGES}
