@@ -4,6 +4,7 @@
 from html.parser import HTMLParser
 from pathlib import Path
 import argparse
+import time
 from urllib.error import URLError
 from urllib.parse import urljoin, urlparse
 from urllib.request import urlopen
@@ -75,10 +76,16 @@ def check_local():
 
 def check_live():
     expected_urls = {language: urljoin(BASE_URL, f"{language}/") for language in LANGUAGES}
+
+    def get_fresh(url):
+        separator = "&" if "?" in url else "?"
+        request_url = f"{url}{separator}language_test={time.time_ns()}"
+        with urlopen(request_url, timeout=20) as response:
+            return response.status, response.read().decode("utf-8")
+
     for source in PAGES:
         source_url = urljoin(BASE_URL, source.removesuffix("index.html"))
-        with urlopen(source_url, timeout=20) as response:
-            html = response.read().decode("utf-8")
+        _, html = get_fresh(source_url)
         hrefs = parse_nav(html)
         actual_urls = {language: urljoin(source_url, href) for language, href in zip(LANGUAGES, hrefs)}
         if len(hrefs) != len(LANGUAGES) or actual_urls != expected_urls:
@@ -86,10 +93,9 @@ def check_live():
         print(f"PASS: live {source} navigation targets all five project-local pages")
 
     for language, url in expected_urls.items():
-        with urlopen(url, timeout=20) as response:
-            html = response.read().decode("utf-8")
-            if response.status != 200:
-                raise AssertionError(f"{url}: HTTP {response.status}")
+        status, html = get_fresh(url)
+        if status != 200:
+            raise AssertionError(f"{url}: HTTP {status}")
         actual = html_language(html)
         if actual != language:
             raise AssertionError(f"{url}: served lang {actual}, expected {language}")
